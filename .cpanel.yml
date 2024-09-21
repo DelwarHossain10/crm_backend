@@ -1,6 +1,6 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/softifly/public_html/
+    - export DEPLOYPATH=/home/softifly/crmapi.softifly.com/
     - /bin/cp * $DEPLOYPATH
 
