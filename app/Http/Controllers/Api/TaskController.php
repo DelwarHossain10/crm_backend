@@ -55,7 +55,7 @@ class TaskController extends Controller
                 'type' => 'nullable|string|max:255',
                 'priority' => 'nullable|string|max:255',
                 'prospect_id' => 'nullable|integer',
-                'assign_to' => 'nullable|string|max:255',
+                'attention_person' => 'nullable|string|max:255',
                 'contact' => 'nullable|string|max:255',
                 'lead_id' => 'nullable|integer',
                 'attachments' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
@@ -86,7 +86,7 @@ class TaskController extends Controller
                 'start_date' => $startDateTime,
                 'due_date' => $dueDateTime,
                 'prospect_id' => $request->input('prospect_id'),
-                'assign_to' => $request->input('attention_person'),
+                'attention_person' => $request->input('attention_person'),
                 'contact' => $request->input('contact'),
                 'lead_id' => $request->input('lead_id'),
                 'attachment' => $attachmentPath,
@@ -127,7 +127,7 @@ class TaskController extends Controller
                 'due_date' => Carbon::parse($task->due_date)->format('Y-m-d'),
                 'due_time' => Carbon::parse($task->due_date)->format('H:i'),
                 'prospect_id' => $task->prospect_id,
-                'assign_to' => $task->assign_to,
+                'attention_person' => $task->attention_person,
                 'contact' => $task->contact,
                 'lead_id' => $task->lead_id,
                 'attachment' => $task->attachment,
@@ -144,7 +144,9 @@ class TaskController extends Controller
             return response()->json($data, 200);
         } catch (\Exception $e) {
             // Log the exception for debugging
-            Log::error('Failed to retrieve task: ' . $e->getMessage());
+
+
+            return response()->json( $e->getMessage(), 403);
 
             // Handle any errors that occur during the process
             return response()->json(['message' => 'Failed to retrieve task!', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -153,6 +155,8 @@ class TaskController extends Controller
 
     public function update(Request $request, $id)
     {
+
+        dd($request->all());
         try {
             // Validate the request
             $request->validate([
@@ -160,7 +164,7 @@ class TaskController extends Controller
                 'type' => 'nullable|string|max:255',
                 'priority' => 'nullable|string|max:255',
                 'prospect_id' => 'nullable|integer',
-                'assign_to' => 'nullable|string|max:255',
+                'attention_person' => 'nullable|string|max:255',
                 'contact' => 'nullable|string|max:255',
                 'lead_id' => 'nullable|integer',
                 'attachments' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
@@ -200,7 +204,7 @@ class TaskController extends Controller
                 'start_date' => $startDateTime,
                 'due_date' => $dueDateTime,
                 'prospect_id' => $request->input('prospect_id', $task->prospect_id),
-                'assign_to' => $request->input('attention_person', $task->assign_to),
+                'attention_person' => $request->input('attention_person', $task->attention_person),
                 'contact' => $request->input('contact', $task->contact),
                 'lead_id' => $request->input('lead_id', $task->lead_id),
                 'attachment' => $attachmentPath,
@@ -219,16 +223,97 @@ class TaskController extends Controller
         }
     }
 
+
+    public function taskUpdate(Request $request, $id)
+    {
+
+        try {
+            // Validate the request
+            $request->validate([
+                'title' => 'nullable|string|max:255',
+                'type' => 'nullable|string|max:255',
+                'priority' => 'nullable|string|max:255',
+                'prospect_id' => 'nullable|integer',
+                'attention_person' => 'nullable|string|max:255',
+                'contact' => 'nullable|string|max:255',
+                'lead_id' => 'nullable|integer',
+                'status' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+            ]);
+
+            // Find the task by ID
+            $task = DB::table('tasks')->where('id', $id)->first();
+
+            // Check if the task exists
+            if (!$task) {
+                return response()->json(['message' => 'Task not found.'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Using Carbon to handle date and time formatting
+            $startDateTime = $request->input('start_date') && $request->input('start_time')
+                ? Carbon::parse($request->input('start_date') . ' ' . $request->input('start_time'))
+                : $task->start_date;
+
+            $dueDateTime = $request->input('due_date') && $request->input('due_time')
+                ? Carbon::parse($request->input('due_date') . ' ' . $request->input('due_time'))
+                : $task->due_date;
+
+            // Handle file upload (keep existing attachment if not updated)
+            $attachmentPath = $task->attachment;
+            if ($request->hasFile('attachment')) {
+                $file = $request->file('attachment');
+                $attachmentPath = $file->store('attachments', 'public');
+            }
+
+            // Update the task
+            DB::table('tasks')->where('id', $id)->update([
+                'title' => $request->input('task_title', $task->title),
+                'type' => $request->input('type', $task->type),
+                'priority' => $request->input('priority', $task->priority),
+                'start_date' => $startDateTime,
+                'due_date' => $dueDateTime,
+                'prospect_id' => $request->input('prospect_id', $task->prospect_id),
+                'attention_person' => $request->input('attention_person', $task->attention_person),
+                'contact' => $request->input('contact', $task->contact),
+                'lead_id' => $request->input('lead_id', $task->lead_id),
+                'attachment' => $attachmentPath,
+                'status' => $request->input('status', $task->status),
+                'description' => $request->input('description', $task->description),
+                'template' => '', // Assuming this is not changing
+                'updated_by' => auth()->user()->id,
+                'updated_at' => now(),
+            ]);
+
+            return response()->json(['message' => 'Task updated successfully!'], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            // Log the error and return the response
+            Log::error('Failed to update task: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to update task!', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+
+
     public function destroy($id)
     {
         try {
-            $task = Task::findOrFail($id);
-            $task->delete();
-            return response()->json(null, 204);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['error' => 'Task not found', 'message' => $e->getMessage()], 404);
+            // Find the task by ID
+            $task = DB::table('tasks')->where('id', $id)->first();
+
+            // Check if the task exists
+            if (!$task) {
+                return response()->json(['message' => 'Task not found.'], Response::HTTP_NOT_FOUND);
+            }
+
+            // Delete the task
+            DB::table('tasks')->where('id', $id)->delete();
+
+            return response()->json(['message' => 'Task deleted successfully!'], Response::HTTP_OK);
         } catch (Exception $e) {
-            return response()->json(['error' => 'Failed to delete task', 'message' => $e->getMessage()], 500);
+            // Log the exception
+            Log::error('Failed to delete task: ' . $e->getMessage());
+
+            return response()->json(['message' => 'Failed to delete task!', 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

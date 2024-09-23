@@ -116,7 +116,7 @@ class SupplierController extends Controller
             if (json_last_error() === JSON_ERROR_NONE && isset($itemJsonDecode->model, $itemJsonDecode->qty, $itemJsonDecode->unit_price)) {
                 DB::table('supplier_items')->insert([
                     'supplier_id' => $supplierId, // Use correct supplier ID from parent supplier creation
-                    'item_id' => $itemJsonDecode->id ?? null, // Null if no item_id provided
+                    'item_id' => isset($itemJsonDecode->item_id) ? $itemJsonDecode->item_id:$itemJsonDecode->id, // Null if no item_id provided
                     'model' => $itemJsonDecode->model,
                     'qty' => $itemJsonDecode->qty,
                     'unit_price' => $itemJsonDecode->unit_price,
@@ -254,22 +254,107 @@ class SupplierController extends Controller
         }
     }
 
-    public function destroy($id)
+    public function supplierUpdate(Request $request)
     {
+        DB::beginTransaction();
+        $id = $request->id;
         try {
-            DB::beginTransaction();
-            $attachments = DB::table('supplier_attachments')->where('supplier_id', $id)->get();
-            foreach ($attachments as $attachment) {
-                Storage::disk('public')->delete($attachment->file_path);
+            // Find the existing supplier record
+            $supplier = DB::table('suppliers')->where('id', $id)->first();
+
+            if (!$supplier) {
+                return response()->json(['message' => 'Supplier not found'], 404);
             }
-            DB::table('supplier_attachments')->where('supplier_id', $id)->delete();
-            DB::table('suppliers')->where('id', $id)->delete();
+
+            // Handle file upload if exists
+            $filePath = $supplier->attachment; // Preserve the existing file path
+            if ($request->hasFile('attachment')) {
+                // Use try-catch for file upload
+                try {
+                    // Optionally, delete the old file if it exists
+                    if ($filePath) {
+                        Storage::disk('public')->delete($filePath);
+                    }
+                    // Store new file
+                    $filePath = $request->file('attachment')->store('attachments', 'public');
+                } catch (\Exception $e) {
+                    return response()->json(['message' => 'File upload failed', 'error' => $e->getMessage()], 500);
+                }
+            }
+
+            // Update supplier data
+            DB::table('suppliers')->where('id', $id)->update([
+                'supplier_name' => $request->input('supplier_name'),
+                'supplier_category' => $request->input('supplier_category'),
+                'supplier_reputation_brand' => $request->input('supplier_reputation_brand'),
+                'important_note' => $request->input('important_note'),
+                'concern_person_info' => $request->input('concern_person_info'),
+                'country' => $request->input('country'),
+                'zone' => $request->input('zone'),
+                'zip_po' => $request->input('zip_po'),
+                'address' => $request->input('address'),
+                'phone' => $request->input('phone'),
+                'fax' => $request->input('fax'),
+                'website' => $request->input('website'),
+                'social_network' => $request->input('social_network'),
+                'attachment' => $filePath, // Update with new file path
+                'updated_at' => now(),
+            ]);
+
+            DB::table('supplier_items')->where('supplier_id', $id)->delete();
+            // Update items if available
+            if ($request->filled('items')) {
+                $this->storeItems($request->items, $id); // Pass supplier ID for item update
+            }
+
             DB::commit();
-            return response()->json(['message' => 'Supplier and its attachments deleted successfully.'], 200);
+
+            return response()->json('Supplier Updated Successfully', 200);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            return response()->json(['message' => 'Failed to update supplier', 'error' => $e->getMessage()], 500);
+        }
+
+    }
+
+    public function destroy($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Find the supplier record
+            $supplier = DB::table('suppliers')->where('id', $id)->first();
+
+            if (!$supplier) {
+                return response()->json(['message' => 'Supplier not found'], 404);
+            }
+
+            // Delete the associated attachment file, if it exists
+            if ($supplier->attachment) {
+                try {
+                    Storage::disk('public')->delete($supplier->attachment);
+                } catch (\Exception $e) {
+                    return response()->json(['message' => 'Failed to delete the attachment', 'error' => $e->getMessage()], 500);
+                }
+            }
+
+            // Delete all associated items
+            DB::table('supplier_items')->where('supplier_id', $id)->delete();
+
+            // Delete the supplier record
+            DB::table('suppliers')->where('id', $id)->delete();
+
+            DB::commit();
+
+            return response()->json(['message' => 'Supplier deleted successfully'], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
             return response()->json(['message' => 'Failed to delete supplier', 'error' => $e->getMessage()], 500);
         }
     }
+
 }

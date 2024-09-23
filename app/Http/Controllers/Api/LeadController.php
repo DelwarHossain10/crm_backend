@@ -111,7 +111,7 @@ class LeadController extends Controller
 
             DB::table('lead_items')->insert([
                 'lead_id' => $leadId, // Use correct lead ID from parent lead creation
-                'item_id' => $itemJsonDecode->id ?? null, // Null if no item_id provided
+                'item_id' =>isset($itemJsonDecode->item_id) ? $itemJsonDecode->item_id:$itemJsonDecode->id, // Null if no item_id provided
                 'model' => $itemJsonDecode->model,
                 'qty' => $itemJsonDecode->qty,
                 'unit_price' => $itemJsonDecode->unit_price,
@@ -160,9 +160,9 @@ class LeadController extends Controller
     }
 
     // Update the specified resource in storage.
-    public function update(Request $request, $id)
+    public function leadUpdate(Request $request, $id)
     {
-        dd($request->all());
+
         // Begin the transaction
         DB::beginTransaction();
 
@@ -235,16 +235,28 @@ class LeadController extends Controller
     // Remove the specified resource from storage.
     public function destroy($id)
     {
+        // Begin the transaction
+        DB::beginTransaction();
+
         try {
+            // Find the lead
             $lead = Lead::findOrFail($id);
-            if ($lead->attachment) {
-                Storage::disk('public')->delete($lead->attachment);
-            }
+
+            // Delete associated lead items
+            DB::table('lead_items')->where('lead_id', $lead->id)->delete();
+
+            // Delete the lead
             $lead->delete();
-            return response()->json('Successfully deleted', 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json(['error' => 'Lead not found'], 404);
+
+            // Commit the transaction if all is successful
+            DB::commit();
+
+            // Return successful response
+            return response()->json(['message' => 'Lead deleted successfully'], 200);
+
         } catch (Exception $e) {
+            // Rollback the transaction on error
+            DB::rollBack();
             return response()->json(['error' => 'Failed to delete lead', 'message' => $e->getMessage()], 500);
         }
     }

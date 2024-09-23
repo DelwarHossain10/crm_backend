@@ -122,6 +122,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::resource('lead', LeadController::class);
     Route::get('/all-lead-paginated', [LeadController::class, 'allLeadPaginated']);
+    Route::post('/lead-update/{id}', [LeadController::class, 'leadUpdate']);
 
     Route::resource('sales-order', SalesOrderController::class);
     Route::get('/all-sales-order-paginated', [SalesOrderController::class, 'allSalesOrderPaginated']);
@@ -129,6 +130,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::resource('task', TaskController::class);
     Route::get('/all-task-paginated', [TaskController::class, 'allTaskPaginated']);
+    Route::post('/task-update/{id}', [TaskController::class, 'taskUpdate']);
 
     Route::resource('quotations', QuotationController::class);
     Route::post('/item-wise-quotations', [QuotationController::class, 'itemWiseQuotation']);
@@ -136,6 +138,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::resource('supplier', SupplierController::class);
     Route::get('/all-supplier-paginated', [SupplierController::class, 'allSupplierPaginated']);
+    Route::post('/supplier-update', [SupplierController::class, 'supplierUpdate']);
 
     Route::apiResource('individualInfo', IndividualInfoController::class);
     Route::apiResource('organizationInfo', OrganizationInfoController::class);
