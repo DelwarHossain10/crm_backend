@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class SalesOrderController extends Controller
 {
@@ -50,8 +51,6 @@ class SalesOrderController extends Controller
     public function store(Request $request)
     {
 
-        dd($request);
-
         // Begin the transaction
         DB::beginTransaction();
 
@@ -63,33 +62,40 @@ class SalesOrderController extends Controller
             }
 
             // Create the lead record
-            $lead = Lead::create([
+            $salesOrder = SalesOrder::create([
+                'sale_order_no' => $request->sale_order_no,
+                'sale_order_date' => $request->sale_order_date,
+                'client_order_no' => $request->client_order_no,
+                'client_order_date' => $request->client_order_date,
+                'sale_order_subject' => $request->sale_order_subject,
                 'prospect_id' => $request->prospect_id,
-                'lead_name' => $request->lead_name,
-                'win_probability_id' => $request->win_probability_id,
-                'estimated_closing_date' => $request->estimated_closing_date,
-                'estimated_closing_amount' => $request->estimated_closing_amount,
-                'attention_person' => $request->attention_person,
-                'lead_stage' => $request->lead_stage,
-                'stage_date' => $request->stage_date,
-                'priority' => $request->priority,
-                'comment' => $request->comment,
+                'lead_id' => $request->lead_id,
+                'quotation_id' => $request->quotation_id,
+                'company_attention_person' => $request->company_attention_person,
+                'phone' => $request->phone,
+                'email_address' => $request->email_address,
+                'designation' => $request->designation,
+                'ordered_amount' => $request->ordered_amount,
+                'delivered_status' => $request->delivered_status,
+                'sale_order_description' => $request->sale_order_description,
+                'key_account_person' => $request->key_account_person,
+                'department' => $request->department,
                 'attachment' => $filePath,
                 'created_by' => Auth::user()->id,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // Store lead items if present
+            // Store Sales Order items if present
             if ($request->filled('items')) {
-                $this->storeItems($request->items, $lead->id); // Fixed typo: $$lead->id to $lead->id
+                $this->storeItems($request->items, $salesOrder->id); // Fixed typo: $$salesOrder->id to $salesOrder->id
             }
 
             // Commit the transaction if all is successful
             DB::commit();
 
             // Return successful response
-            return response()->json($lead, 201);
+            return response()->json($salesOrder, 201);
 
         } catch (ValidationException $e) {
             // Rollback the transaction on validation error
@@ -102,40 +108,22 @@ class SalesOrderController extends Controller
             return response()->json(['error' => 'Failed to create lead', 'message' => $e->getMessage()], 500);
         }
 
-        $validator = Validator::make($request->all(), [
-            'sale_order_date' => 'required|date',
-            'client_order_no' => 'required|string|max:191',
-            'client_order_date' => 'required|date',
-            'sale_order_subject' => 'required|string|max:191',
-            'prospect_id' => 'nullable|integer',
-            'lead_id' => 'nullable|integer',
-            'quotation_id' => 'nullable|integer',
-            'ordered_amount' => 'nullable|numeric',
-            'key_account_person_id' => 'nullable|integer',
-            'sale_order_description' => 'nullable|string',
-        ]);
+    }
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
+    private function storeItems($items, $leadId)
+    {
+        foreach ($items as $item) {
+            $itemJsonDecode = json_decode($item); // Decode the item JSON object
 
-        try {
-            $data = $request->all();
-            $data['sale_order_date'] = Carbon::parse($data['sale_order_date']);
-            $data['client_order_date'] = Carbon::parse($data['client_order_date']);
-            $data['created_at'] = Carbon::now();
-            $data['updated_at'] = Carbon::now();
-
-            if ($request->hasFile('attachment')) {
-                $data['attachment'] = $request->file('attachment')->store('sales_order', 'public');
-            }
-
-            SalesOrder::create($data);
-
-            return response()->json(['message' => 'Sale order created successfully.'], 201);
-        } catch (\Exception $e) {
-
-            return response()->json(['error' => 'Failed to create sale order.'], 500);
+            DB::table('order_items')->insert([
+                'order_id' => $leadId, // Use correct lead ID from parent lead creation
+                'item_id' =>isset($itemJsonDecode->item_id) ? $itemJsonDecode->item_id:$itemJsonDecode->id, // Null if no item_id provided
+                'model' => $itemJsonDecode->model,
+                'qty' => $itemJsonDecode->qty,
+                'unit_price' => $itemJsonDecode->unit_price,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
         }
     }
 
@@ -143,80 +131,160 @@ class SalesOrderController extends Controller
     {
 
         try {
-            $saleOrder = SalesOrder::find($id);
-            if (!$saleOrder) {
-                return response()->json(['error' => 'Sale order not found.'], 404);
+            // Fetch the order details
+            $order = DB::table('sale_orders')->where('id', $id)->first();
+
+            if (!$order) {
+                // Return a 404 response if the order is not found
+                return response()->json(['error' => 'Order not found'], 404);
             }
-            return response()->json($saleOrder);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to retrieve sale order.'], 500);
+
+            // Fetch the related items
+            $items = DB::table('order_items')
+                ->where('order_id', $id)
+                ->get() // Retrieve the collection of items first
+                ->map(function ($item) {
+                    // Retrieve the item_name from the items table using item_id
+                    $item->item_name = DB::table('items')
+                        ->where('id', $item->item_id)
+                        ->value('item_name'); // Fetch only the item_name column
+
+                    return $item;
+                });
+
+            // Return the lead with its associated items
+            return response()->json([
+                'order' => $order,
+                'items' => $items,
+            ], 200);
+
+        } catch (Exception $e) {
+            // Handle any other errors
+            return response()->json(['error' => 'Failed to fetch lead', 'message' => $e->getMessage()], 500);
         }
     }
 
     public function update(Request $request, $id)
     {
-
-        $validator = Validator::make($request->all(), [
-            'sale_order_date' => 'required|date',
-            'client_order_no' => 'required|string|max:191',
-            'client_order_date' => 'required|date',
-            'sale_order_subject' => 'required|string|max:191',
-            'prospect_id' => 'nullable|integer',
-            'lead_id' => 'nullable|integer',
-            'quotation_id' => 'nullable|integer',
-            'ordered_amount' => 'nullable|numeric',
-            'key_account_person_id' => 'nullable|integer',
-            'sale_order_description' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
+        // Begin the transaction
+        DB::beginTransaction();
 
         try {
-            $saleOrder = SalesOrder::find($id);
-            if (!$saleOrder) {
-                return response()->json(['error' => 'Sale order not found.'], 404);
-            }
+            // Retrieve the existing sales order record
+            $salesOrder = SalesOrder::findOrFail($request->id);
 
-            $data = $request->all();
-            $data['sale_order_date'] = Carbon::parse($data['sale_order_date']);
-            $data['client_order_date'] = Carbon::parse($data['client_order_date']);
-            $data['updated_at'] = Carbon::now();
-
+            // Handle file upload if exists
+            $filePath = $salesOrder->attachment; // Keep current attachment
             if ($request->hasFile('attachment')) {
-
-                if ($saleOrder->attachment) {
-                    Storage::disk('public')->delete($saleOrder->attachment);
+                // Delete the old attachment if exists
+                if ($salesOrder->attachment) {
+                    Storage::disk('public')->delete($salesOrder->attachment);
                 }
-                // Store new attachment
-                $data['attachment'] = $request->file('attachment')->store('sales_order', 'public');
+                // Store the new attachment
+                $filePath = $request->file('attachment')->store('attachments', 'public');
             }
 
-            $saleOrder->update($data);
+            // Update the sales order record
+            $salesOrder->update([
+                'sale_order_no' => $request->sale_order_no,
+                'sale_order_date' => $request->sale_order_date,
+                'client_order_no' => $request->client_order_no,
+                'client_order_date' => $request->client_order_date,
+                'sale_order_subject' => $request->sale_order_subject,
+                'prospect_id' => $request->prospect_id,
+                'lead_id' => $request->lead_id,
+                'quotation_id' => $request->quotation_id,
+                'company_attention_person' => $request->company_attention_person,
+                'phone' => $request->phone,
+                'email_address' => $request->email_address,
+                'designation' => $request->designation,
+                'ordered_amount' => $request->ordered_amount,
+                'delivered_status' => $request->delivered_status,
+                'sale_order_description' => $request->sale_order_description,
+                'key_account_person' => $request->key_account_person,
+                'department' => $request->department,
+                'attachment' => $filePath,
+                'updated_at' => now(),
+            ]);
 
-            return response()->json(['message' => 'Sale order updated successfully.']);
-        } catch (\Exception $e) {
+            // Update or store sales order items if present
+            if ($request->filled('items')) {
+                // Optionally, you can clear existing items and store new ones
+                $this->updateItems($request->items, $salesOrder->id); // Implement `updateItems` to handle item updates
+            }
 
-            return response()->json(['error' => 'Failed to update sale order.'], 500);
+            // Commit the transaction
+            DB::commit();
+
+            // Return successful response
+            return response()->json($salesOrder, 200);
+
+        } catch (ValidationException $e) {
+            // Rollback the transaction on validation error
+            DB::rollBack();
+            return response()->json(['error' => 'Validation Error', 'messages' => $e->errors()], 422);
+
+        } catch (Exception $e) {
+            // Rollback the transaction on general error
+            DB::rollBack();
+            return response()->json(['error' => 'Failed to update sales order', 'message' => $e->getMessage()], 500);
         }
     }
+
+    private function updateItems($items, $orderId)
+{
+    // Remove existing items for the given order ID
+    DB::table('order_items')->where('order_id', $orderId)->delete();
+
+    // Reinsert the updated items
+    foreach ($items as $item) {
+        $itemJsonDecode = json_decode($item); // Decode the item JSON object
+
+        DB::table('order_items')->insert([
+            'order_id' => $orderId, // Use correct order ID from parent order update
+            'item_id' => isset($itemJsonDecode->item_id) ? $itemJsonDecode->item_id : $itemJsonDecode->id, // Null if no item_id provided
+            'model' => $itemJsonDecode->model,
+            'qty' => $itemJsonDecode->qty,
+            'unit_price' => $itemJsonDecode->unit_price,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+}
 
     // Delete Sale Order
     public function destroy($id)
     {
+        // Begin the transaction
+        DB::beginTransaction();
+
         try {
-            $saleOrder = SalesOrder::find($id);
-            if (!$saleOrder) {
-                return response()->json(['error' => 'Sale order not found.'], 404);
-            }
+            // Find the SalesOrder by ID
+            $salesOrder = SalesOrder::findOrFail($id);
 
-            $saleOrder->delete();
+            // Delete related items from the order_items table
+            DB::table('order_items')->where('order_id', $id)->delete();
 
-            return response()->json(['message' => 'Sale order deleted successfully.']);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to delete sale order.'], 500);
+            // Delete the SalesOrder itself
+            $salesOrder->delete();
+
+            // Commit the transaction
+            DB::commit();
+
+            // Return success response
+            return response()->json(['message' => 'Sales order and its items deleted successfully'], 200);
+
+        } catch (ValidationException $e) {
+            // Rollback the transaction on not found error
+            DB::rollBack();
+            return response()->json(['error' => 'Sales order not found'], 404);
+
+        } catch (Exception $e) {
+            // Rollback the transaction on any other error
+            DB::rollBack();
+            return response()->json(['error' => 'Failed to delete sales order', 'message' => $e->getMessage()], 500);
         }
     }
+
 
 }
