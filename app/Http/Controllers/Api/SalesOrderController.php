@@ -60,6 +60,7 @@ class SalesOrderController extends Controller
             if ($request->hasFile('attachment')) {
                 $filePath = $request->file('attachment')->store('attachments', 'public');
             }
+            
 
             // Create the lead record
             $salesOrder = SalesOrder::create([
