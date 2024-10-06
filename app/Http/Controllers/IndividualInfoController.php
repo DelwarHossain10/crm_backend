@@ -28,9 +28,12 @@ class IndividualInfoController extends Controller
     // Store new individual info data
     public function store(Request $request)
     {
+
         $initial_info = is_string($request->input('initial_info')) ? json_decode($request->input('initial_info'), true) : $request->input('initial_info');
         $concern_person = is_string($request->input('concern_person')) ? json_decode($request->input('concern_person'), true) : $request->input('concern_person');
         $organization_address = is_string($request->input('organization_address')) ? json_decode($request->input('organization_address'), true) : $request->input('organization_address') ?? [];
+
+        dd($initial_info,$concern_person,$organization_address,$request);
 
         $initialInfo = $concernPerson = $organizationAddress = null;
 

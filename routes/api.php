@@ -140,8 +140,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/all-supplier-paginated', [SupplierController::class, 'allSupplierPaginated']);
     Route::post('/supplier-update', [SupplierController::class, 'supplierUpdate']);
 
-    Route::apiResource('individualInfo', IndividualInfoController::class);
-    Route::apiResource('organizationInfo', OrganizationInfoController::class);
+    Route::apiResource('individual-info', IndividualInfoController::class);
+    Route::apiResource('organization-info', OrganizationInfoController::class);
 
 
 });

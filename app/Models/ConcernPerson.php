@@ -12,8 +12,19 @@ class ConcernPerson extends Model
     protected $table = 'concern_person';
 
     protected $fillable = [
-        'name', 'phone', 'date_of_birth', 'role_id', 'job_type_id', 'gender',
-        'social_network', 'email', 'designation_id', 'department_id',
-        'profession_id', 'attactment', 'image', 'status'
+        'name',
+        'primary_status',
+        'phone',
+        'email',
+        'date_of_birth',
+        'designation',
+        'influencing_role',
+        'department',
+        'job_type',
+        'profession',
+        'gender',
+        'social_network',
+        'zone',
+        'attactment'
     ];
 }

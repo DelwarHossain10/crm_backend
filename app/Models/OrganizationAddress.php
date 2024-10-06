@@ -12,7 +12,15 @@ class OrganizationAddress extends Model
     protected $table = 'organization_address';
 
     protected $fillable = [
-        'address', 'zip', 'phone', 'website', 'latitude', 'zone_id', 'fax',
-        'social_network', 'longitude', 'image', 'status'
+        'address',
+        'zone',
+        'zip',
+        'phone',
+        'website',
+        'latitude',
+        'longitude',
+        'social_network',
+        'fax',
+        'social_network'
     ];
 }

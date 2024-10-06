@@ -11,8 +11,17 @@ class InitialInfo extends Model
     protected $table = 'initial_info';
 
     protected $fillable = [
-        'name', 'project_name', 'service_id', 'info_source_id', 'organization_type_id',
-        'campaign_id', 'note', 'industry_type_id', 'organization_name',
-        'prospect_assigned_to_id', 'contacted_by_id', 'attactment', 'image'
+        'organization_name',
+        'industry_type',
+        'project_name',
+        'organization_short_name',
+        'interested_item_service',
+        'information_source',
+        'prospect_assigned_to',
+        'organization_type',
+        'campaign',
+        'contacted_by',
+        'important_note',
+        'attactment',
     ];
 }
