@@ -30,6 +30,9 @@ class OrganizationInfoController extends Controller
     // Store new individual info data
     public function store(Request $request)
     {
+
+        dd($request->all());
+
         // Validate the request data
         $validatedData = $request->validate([
             'organization_initial_info' => 'nullable|json',
@@ -47,7 +50,6 @@ class OrganizationInfoController extends Controller
         $organization_communication_info = json_decode($request->input('organization_communication_info'), true);
         $organization_service_info = json_decode($request->input('organization_service_info'), true);
 
-       // dd($organization_communication_info);
 
         $organization_initial_info_record = null;
         if ($organization_initial_info) {

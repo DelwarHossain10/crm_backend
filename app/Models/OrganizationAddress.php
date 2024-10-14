@@ -21,6 +21,5 @@ class OrganizationAddress extends Model
         'longitude',
         'social_network',
         'fax',
-        'social_network'
     ];
 }

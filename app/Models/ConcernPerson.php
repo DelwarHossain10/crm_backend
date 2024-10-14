@@ -24,7 +24,6 @@ class ConcernPerson extends Model
         'profession',
         'gender',
         'social_network',
-        'zone',
-        'attactment'
+        'attachments'
     ];
 }

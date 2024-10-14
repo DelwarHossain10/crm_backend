@@ -22,6 +22,6 @@ class InitialInfo extends Model
         'campaign',
         'contacted_by',
         'important_note',
-        'attactment',
+        'attachments',
     ];
 }
